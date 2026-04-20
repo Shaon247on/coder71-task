@@ -1,45 +1,58 @@
 // lib/auth.ts
-// Purpose: JWT creation/verification and HTTP-only cookie helpers.
-// Keeps all auth logic in one place, separate from route handlers.
-
-import jwt from "jsonwebtoken";
+import { SignJWT, jwtVerify } from "jose";
 import { NextRequest, NextResponse } from "next/server";
 
-const JWT_SECRET = process.env.JWT_SECRET!;
-const COOKIE_NAME = "slb_token"; // slb = split-layout-builder
-const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days in seconds
+export const COOKIE_NAME = "slb_token";
+const COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
 
-if (!JWT_SECRET) {
+const secret = process.env.JWT_SECRET;
+if (!secret) {
   throw new Error("JWT_SECRET environment variable is not set.");
 }
+
+const secretKey = new TextEncoder().encode(secret);
 
 export interface JWTPayload {
   userId: string;
   email: string;
 }
 
-/** Creates a signed JWT containing userId and email */
-export function signToken(payload: JWTPayload): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: "7d" });
+export async function signToken(payload: JWTPayload): Promise<string> {
+  return await new SignJWT(payload)
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime("7d")
+    .sign(secretKey);
 }
 
-/** Verifies a JWT. Returns the payload or null if invalid/expired. */
-export function verifyToken(token: string): JWTPayload | null {
+export async function verifyToken(token: string): Promise<JWTPayload | null> {
   try {
-    return jwt.verify(token, JWT_SECRET) as JWTPayload;
+    const { payload } = await jwtVerify(token, secretKey);
+
+    if (
+      typeof payload.userId !== "string" ||
+      typeof payload.email !== "string"
+    ) {
+      return null;
+    }
+
+    return {
+      userId: payload.userId,
+      email: payload.email,
+    };
   } catch {
     return null;
   }
 }
 
-/** Extracts and verifies the JWT from an incoming request's cookies */
-export function getAuthPayload(request: NextRequest): JWTPayload | null {
+export async function getAuthPayload(
+  request: NextRequest
+): Promise<JWTPayload | null> {
   const token = request.cookies.get(COOKIE_NAME)?.value;
   if (!token) return null;
-  return verifyToken(token);
+  return await verifyToken(token);
 }
 
-/** Attaches a signed JWT as an HTTP-only cookie to a NextResponse */
 export function setAuthCookie(response: NextResponse, token: string): void {
   response.cookies.set(COOKIE_NAME, token, {
     httpOnly: true,
@@ -50,7 +63,6 @@ export function setAuthCookie(response: NextResponse, token: string): void {
   });
 }
 
-/** Clears the auth cookie by setting maxAge to 0 */
 export function clearAuthCookie(response: NextResponse): void {
   response.cookies.set(COOKIE_NAME, "", {
     httpOnly: true,
@@ -60,5 +72,3 @@ export function clearAuthCookie(response: NextResponse): void {
     path: "/",
   });
 }
-
-export { COOKIE_NAME };

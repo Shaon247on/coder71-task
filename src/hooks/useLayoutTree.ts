@@ -1,47 +1,50 @@
-// hooks/useLayoutTree.ts
-// Purpose: The single source of truth for the layout tree state.
-// Exposes typed actions for splitting nodes and updating resize ratios.
-// Keeps ALL tree mutation logic out of components.
+// src/hooks/useLayoutTree.ts
 
 "use client";
 
-import { useState, useCallback } from "react";
+import { useCallback, useState } from "react";
 import { LayoutNode, SplitDirection } from "@/types/layout";
-import { splitNode, updateSplitRatio, createInitialTree } from "@/lib/layoutUtils";
+import {
+  createInitialTree,
+  removeNode,
+  splitNode,
+  updateSplitRatio,
+} from "@/lib/layoutUtils";
 
 interface UseLayoutTreeReturn {
   tree: LayoutNode;
-  setTree: (tree: LayoutNode) => void;
+  setTree: React.Dispatch<React.SetStateAction<LayoutNode>>;
   split: (nodeId: string, direction: SplitDirection) => void;
+  remove: (nodeId: string) => void;
   updateRatio: (nodeId: string, ratio: number) => void;
   resetTree: () => void;
 }
 
 export function useLayoutTree(initialTree?: LayoutNode): UseLayoutTreeReturn {
-  const [tree, setTree] = useState<LayoutNode>(
-    initialTree ?? createInitialTree()
-  );
+  const [tree, setTree] = useState<LayoutNode>(initialTree ?? createInitialTree());
 
-  /** Splits a leaf node in the given direction */
-  const split = useCallback(
-    (nodeId: string, direction: SplitDirection) => {
-      setTree((current) => splitNode(current, nodeId, direction));
-    },
-    []
-  );
+  const split = useCallback((nodeId: string, direction: SplitDirection) => {
+    setTree((currentTree) => splitNode(currentTree, nodeId, direction));
+  }, []);
 
-  /** Updates the drag ratio of a split container during resize */
-  const updateRatio = useCallback(
-    (nodeId: string, ratio: number) => {
-      setTree((current) => updateSplitRatio(current, nodeId, ratio));
-    },
-    []
-  );
+  const remove = useCallback((nodeId: string) => {
+    setTree((currentTree) => removeNode(currentTree, nodeId));
+  }, []);
 
-  /** Resets the layout to a fresh single-block tree */
+  const updateRatio = useCallback((nodeId: string, ratio: number) => {
+    setTree((currentTree) => updateSplitRatio(currentTree, nodeId, ratio));
+  }, []);
+
   const resetTree = useCallback(() => {
     setTree(createInitialTree());
   }, []);
 
-  return { tree, setTree, split, updateRatio, resetTree };
+  return {
+    tree,
+    setTree,
+    split,
+    remove,
+    updateRatio,
+    resetTree,
+  };
 }

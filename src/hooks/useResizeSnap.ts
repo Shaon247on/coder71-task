@@ -1,15 +1,14 @@
-// hooks/useResizeSnap.ts
-// Purpose: Handles all mouse/touch drag logic for the resize handle.
-// Calculates ratio from pixel positions, applies snap-to-grid, and emits updates.
+// src/hooks/useResizeSnap.ts
 
 "use client";
 
-import { useRef, useState, useCallback } from "react";
-import { applySnap } from "@/lib/layoutUtils";
+import { RefObject, useCallback, useState } from "react";
+import { applySnap, clampRatio } from "@/lib/layoutUtils";
 import { SplitDirection } from "@/types/layout";
 
 interface UseResizeSnapOptions {
   direction: SplitDirection;
+  containerRef: RefObject<HTMLDivElement | null>;
   onRatioChange: (ratio: number) => void;
 }
 
@@ -21,59 +20,55 @@ interface UseResizeSnapReturn {
 
 export function useResizeSnap({
   direction,
+  containerRef,
   onRatioChange,
 }: UseResizeSnapOptions): UseResizeSnapReturn {
   const [isDragging, setIsDragging] = useState(false);
   const [currentRatio, setCurrentRatio] = useState<number | null>(null);
 
-  // We store the container ref so we can calculate ratio relative to it
-  const containerRef = useRef<Element | null>(null);
-
   const handleMouseDown = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
       e.preventDefault();
+      e.stopPropagation();
 
-      // Walk up to find the split container element (parent of the handle)
-      const handle = e.currentTarget;
-      const container = handle.parentElement;
-      if (!container) return;
+      const handleMouseMove = (moveEvent: MouseEvent) => {
+        const container = containerRef.current;
+        if (!container) return;
 
-      containerRef.current = container;
-      setIsDragging(true);
+        const rect = container.getBoundingClientRect();
 
-      const onMouseMove = (moveEvent: MouseEvent) => {
-        const rect = containerRef.current!.getBoundingClientRect();
         let rawRatio: number;
 
         if (direction === "horizontal") {
-          // Horizontal split: ratio is X position within container
           rawRatio = (moveEvent.clientX - rect.left) / rect.width;
         } else {
-          // Vertical split: ratio is Y position within container
           rawRatio = (moveEvent.clientY - rect.top) / rect.height;
         }
 
-        // Clamp to prevent zero-size panels
-        const clamped = Math.min(0.95, Math.max(0.05, rawRatio));
-        // Apply snap assistance
-        const snapped = applySnap(clamped);
+        const clampedRatio = clampRatio(rawRatio);
+        const snappedRatio = applySnap(clampedRatio);
 
-        setCurrentRatio(snapped);
-        onRatioChange(snapped);
+        setCurrentRatio(snappedRatio);
+        onRatioChange(snappedRatio);
       };
 
-      const onMouseUp = () => {
+      const handleMouseUp = () => {
         setIsDragging(false);
         setCurrentRatio(null);
-        document.removeEventListener("mousemove", onMouseMove);
-        document.removeEventListener("mouseup", onMouseUp);
+        window.removeEventListener("mousemove", handleMouseMove);
+        window.removeEventListener("mouseup", handleMouseUp);
       };
 
-      document.addEventListener("mousemove", onMouseMove);
-      document.addEventListener("mouseup", onMouseUp);
+      setIsDragging(true);
+      window.addEventListener("mousemove", handleMouseMove);
+      window.addEventListener("mouseup", handleMouseUp);
     },
-    [direction, onRatioChange]
+    [containerRef, direction, onRatioChange]
   );
 
-  return { isDragging, currentRatio, handleMouseDown };
+  return {
+    isDragging,
+    currentRatio,
+    handleMouseDown,
+  };
 }

@@ -1,6 +1,3 @@
-// app/api/auth/login/route.ts
-// Purpose: Authenticates a user by verifying their password and issuing a JWT cookie.
-
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
@@ -14,25 +11,24 @@ export async function POST(request: NextRequest) {
     const parsed = loginSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
-        { error: parsed.error.message },
+        { error: parsed.error.flatten() },
         { status: 400 }
       );
     }
 
     const { email, password } = parsed.data;
 
-    // Find user by email
     const user = await prisma.user.findUnique({ where: { email } });
+
     if (!user) {
-      // Use a generic message to avoid leaking whether the email exists
       return NextResponse.json(
         { error: "Invalid email or password." },
         { status: 401 }
       );
     }
 
-    // Compare submitted password with stored hash
     const isValid = await bcrypt.compare(password, user.password);
+
     if (!isValid) {
       return NextResponse.json(
         { error: "Invalid email or password." },
@@ -40,16 +36,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const token = signToken({ userId: user.id, email: user.email });
+    const token = await signToken({ userId: user.id, email: user.email });
+
     const response = NextResponse.json(
-      { user: { id: user.id, email: user.email } },
+      {
+        user: {
+          id: user.id,
+          email: user.email,
+        },
+      },
       { status: 200 }
     );
-    setAuthCookie(response, token);
 
+    setAuthCookie(response, token);
     return response;
   } catch (error) {
     console.error("[POST /api/auth/login]", error);
-    return NextResponse.json({ error: "Internal server error." }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error." },
+      { status: 500 }
+    );
   }
 }

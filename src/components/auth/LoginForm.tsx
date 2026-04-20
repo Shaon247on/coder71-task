@@ -1,79 +1,128 @@
-// hooks/useResizeSnap.ts
-// Purpose: Handles all mouse/touch drag logic for the resize handle.
-// Calculates ratio from pixel positions, applies snap-to-grid, and emits updates.
-
 "use client";
 
-import { useRef, useState, useCallback } from "react";
-import { applySnap } from "@/lib/layoutUtils";
-import { SplitDirection } from "@/types/layout";
+import { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { LoginInput, loginSchema } from "@/validators/authSchema";
 
-interface UseResizeSnapOptions {
-  direction: SplitDirection;
-  onRatioChange: (ratio: number) => void;
-}
+export function LoginForm() {
+  const router = useRouter();
+  const [serverError, setServerError] = useState<string | null>(null);
 
-interface UseResizeSnapReturn {
-  isDragging: boolean;
-  currentRatio: number | null;
-  handleMouseDown: (e: React.MouseEvent<HTMLDivElement>) => void;
-}
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginInput>({
+    resolver: zodResolver(loginSchema),
+  });
 
-export function useResizeSnap({
-  direction,
-  onRatioChange,
-}: UseResizeSnapOptions): UseResizeSnapReturn {
-  const [isDragging, setIsDragging] = useState(false);
-  const [currentRatio, setCurrentRatio] = useState<number | null>(null);
+  const onSubmit = async (data: LoginInput) => {
+    setServerError(null);
 
-  // We store the container ref so we can calculate ratio relative to it
-  const containerRef = useRef<Element | null>(null);
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      });
 
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      e.preventDefault();
+      const json = await res.json();
 
-      // Walk up to find the split container element (parent of the handle)
-      const handle = e.currentTarget;
-      const container = handle.parentElement;
-      if (!container) return;
+      if (!res.ok) {
+        setServerError(json.error ?? "Login failed. Please try again.");
+        return;
+      }
 
-      containerRef.current = container;
-      setIsDragging(true);
+      router.push("/dashboard");
+      router.refresh();
+    } catch {
+      setServerError("Network error. Please try again.");
+    }
+  };
 
-      const onMouseMove = (moveEvent: MouseEvent) => {
-        const rect = containerRef.current!.getBoundingClientRect();
-        let rawRatio: number;
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-gray-50">
+      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-lg">
+        <h1 className="mb-2 text-2xl font-bold text-gray-900">Welcome back</h1>
+        <p className="mb-8 text-sm text-gray-500">
+          Sign in to access your saved layout
+        </p>
 
-        if (direction === "horizontal") {
-          // Horizontal split: ratio is X position within container
-          rawRatio = (moveEvent.clientX - rect.left) / rect.width;
-        } else {
-          // Vertical split: ratio is Y position within container
-          rawRatio = (moveEvent.clientY - rect.top) / rect.height;
-        }
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
+          <div>
+            <label
+              htmlFor="email"
+              className="mb-1 block text-sm font-medium text-gray-700"
+            >
+              Email address
+            </label>
+            <input
+              {...register("email")}
+              id="email"
+              type="email"
+              autoComplete="email"
+              placeholder="you@example.com"
+              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+            {errors.email && (
+              <p className="mt-1.5 text-xs text-red-600">
+                {errors.email.message}
+              </p>
+            )}
+          </div>
 
-        // Clamp to prevent zero-size panels
-        const clamped = Math.min(0.95, Math.max(0.05, rawRatio));
-        // Apply snap assistance
-        const snapped = applySnap(clamped);
+          <div>
+            <label
+              htmlFor="password"
+              className="mb-1 block text-sm font-medium text-gray-700"
+            >
+              Password
+            </label>
+            <input
+              {...register("password")}
+              id="password"
+              type="password"
+              autoComplete="current-password"
+              placeholder="Enter your password"
+              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+            {errors.password && (
+              <p className="mt-1.5 text-xs text-red-600">
+                {errors.password.message}
+              </p>
+            )}
+          </div>
 
-        setCurrentRatio(snapped);
-        onRatioChange(snapped);
-      };
+          {serverError && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+              <p className="text-sm text-red-700">{serverError}</p>
+            </div>
+          )}
 
-      const onMouseUp = () => {
-        setIsDragging(false);
-        setCurrentRatio(null);
-        document.removeEventListener("mousemove", onMouseMove);
-        document.removeEventListener("mouseup", onMouseUp);
-      };
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isSubmitting ? "Signing in..." : "Sign in"}
+          </button>
+        </form>
 
-      document.addEventListener("mousemove", onMouseMove);
-      document.addEventListener("mouseup", onMouseUp);
-    },
-    [direction, onRatioChange]
+        <p className="mt-6 text-center text-sm text-gray-500">
+          Don&apos;t have an account?{" "}
+          <Link
+            href="/signup"
+            className="font-medium text-indigo-600 hover:text-indigo-700"
+          >
+            Create one
+          </Link>
+        </p>
+      </div>
+    </div>
   );
-
-  return { isDragging, currentRatio, handleMouseDown };
 }
