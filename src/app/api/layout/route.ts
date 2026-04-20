@@ -26,9 +26,10 @@ export async function GET(request: NextRequest) {
     {
       status: 200,
       headers: {
-        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+        "Cache-Control":
+          "no-store, no-cache, must-revalidate, proxy-revalidate",
       },
-    }
+    },
   );
 }
 
@@ -50,7 +51,7 @@ export async function POST(request: NextRequest) {
           error: "Invalid layout data.",
           details: parsed.error.flatten(),
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -66,19 +67,20 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json(
-      { tree: layout.tree as LayoutNode },
+      { tree: layout.tree as unknown as LayoutNode },
       {
         status: 200,
         headers: {
-          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+          "Cache-Control":
+            "no-store, no-cache, must-revalidate, proxy-revalidate",
         },
-      }
+      },
     );
   } catch (error) {
     console.error("[POST /api/layout]", error);
     return NextResponse.json(
       { error: "Internal server error." },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

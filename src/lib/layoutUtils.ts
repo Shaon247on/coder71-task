@@ -45,13 +45,17 @@ export function splitNode(
     return splitContainer;
   }
 
-  if (isLeaf(tree)) return tree;
+  if (!isSplitNode(tree)) {
+    return tree;
+  }
+
+  const splitTree: LayoutSplitNode = tree;
 
   return {
-    ...tree,
+    ...splitTree,
     children: [
-      splitNode(tree.children[0], nodeId, direction),
-      splitNode(tree.children[1], nodeId, direction),
+      splitNode(splitTree.children[0], nodeId, direction),
+      splitNode(splitTree.children[1], nodeId, direction),
     ],
   };
 }
@@ -70,13 +74,17 @@ export function updateSplitRatio(
     };
   }
 
-  if (isLeaf(tree)) return tree;
+  if (!isSplitNode(tree)) {
+    return tree;
+  }
+
+  const splitTree: LayoutSplitNode = tree;
 
   return {
-    ...tree,
+    ...splitTree,
     children: [
-      updateSplitRatio(tree.children[0], nodeId, ratio),
-      updateSplitRatio(tree.children[1], nodeId, ratio),
+      updateSplitRatio(splitTree.children[0], nodeId, ratio),
+      updateSplitRatio(splitTree.children[1], nodeId, ratio),
     ],
   };
 }
@@ -87,11 +95,12 @@ export function removeNode(tree: LayoutNode, nodeId: string): LayoutNode {
 }
 
 function removeNodeInternal(tree: LayoutNode, nodeId: string): LayoutNode | null {
-  if (isLeaf(tree)) {
+  if (!isSplitNode(tree)) {
     return tree.id === nodeId ? null : tree;
   }
 
   const [leftChild, rightChild] = tree.children;
+  
 
   const nextLeft = removeNodeInternal(leftChild, nodeId);
   const nextRight = removeNodeInternal(rightChild, nodeId);
