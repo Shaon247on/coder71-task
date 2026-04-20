@@ -466,7 +466,7 @@ npm install
 ```
 
 ### 2. Create environment file
-Create a `.env.local` file using `.env.example`
+Create a `.env` file using `.env.example`
 
 ### 3. Generate Prisma client
 ```bash
